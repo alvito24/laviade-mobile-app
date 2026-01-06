@@ -14,123 +14,176 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  late Future<List<Product>> _productsFuture;
+  late Future<List<Product>> _newArrivalsFuture;
+  late Future<List<Product>> _bestSellersFuture;
 
   @override
   void initState() {
     super.initState();
-    _productsFuture = Provider.of<ProductService>(
-      context,
-      listen: false,
-    ).getProducts();
+    final productService = Provider.of<ProductService>(context, listen: false);
+    _newArrivalsFuture = productService.getNewArrivals();
+    _bestSellersFuture = productService.getBestSellers();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            floating: true,
-            title: const Text(
-              'LAVIADE.',
-              style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          setState(() {
+            final productService = Provider.of<ProductService>(
+              context,
+              listen: false,
+            );
+            _newArrivalsFuture = productService.getNewArrivals();
+            _bestSellersFuture = productService.getBestSellers();
+          });
+        },
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              floating: true,
+              title: const Text(
+                'LAVIADE.',
+                style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2),
+              ),
+              centerTitle: true,
+              actions: [
+                IconButton(icon: const Icon(Icons.search), onPressed: () {}),
+              ],
             ),
-            centerTitle: true,
-            actions: [
-              IconButton(icon: const Icon(Icons.search), onPressed: () {}),
-            ],
-          ),
-          SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Banner
-                CarouselSlider(
-                  options: CarouselOptions(
-                    height: 200.0,
-                    autoPlay: true,
-                    enlargeCenterPage: true,
-                    viewportFraction: 0.9,
-                    aspectRatio: 16 / 9,
+            SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Banner Carousel
+                  CarouselSlider(
+                    options: CarouselOptions(
+                      height: 200.0,
+                      autoPlay: true,
+                      enlargeCenterPage: true,
+                      viewportFraction: 0.9,
+                      aspectRatio: 16 / 9,
+                    ),
+                    items: [
+                      _buildBannerItem('NEW COLLECTION', '2026', Colors.black),
+                      _buildBannerItem(
+                        'SALE UP TO',
+                        '50% OFF',
+                        Colors.red[800]!,
+                      ),
+                      _buildBannerItem(
+                        'FREE SHIPPING',
+                        'Min. Order 500K',
+                        Colors.grey[800]!,
+                      ),
+                    ],
                   ),
-                  items: [1, 2, 3].map((i) {
-                    return Builder(
-                      builder: (BuildContext context) {
-                        return Container(
-                          width: MediaQuery.of(context).size.width,
-                          margin: const EdgeInsets.symmetric(horizontal: 5.0),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[300],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Center(
-                            child: Text(
-                              'Campaign $i',
-                              style: const TextStyle(fontSize: 16.0),
-                            ),
-                          ),
+
+                  const SizedBox(height: 24),
+
+                  // New Release Section
+                  SectionHeader(title: 'New Release', onViewAll: () {}),
+                  SizedBox(
+                    height: 280,
+                    child: FutureBuilder<List<Product>>(
+                      future: _newArrivalsFuture,
+                      builder: (ctx, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+                        if (snapshot.hasError) {
+                          return _buildEmptyState('Gagal memuat produk');
+                        }
+                        final products = snapshot.data ?? [];
+                        if (products.isEmpty) {
+                          return _buildEmptyState('Belum ada produk baru');
+                        }
+
+                        return ListView.builder(
+                          padding: const EdgeInsets.only(left: 16),
+                          scrollDirection: Axis.horizontal,
+                          itemCount: products.length,
+                          itemBuilder: (ctx, i) =>
+                              ProductItem(product: products[i]),
                         );
                       },
-                    );
-                  }).toList(),
-                ),
-
-                const SizedBox(height: 16),
-
-                // New Release
-                SectionHeader(title: 'New Release', onViewAll: () {}),
-                SizedBox(
-                  height: 270,
-                  child: FutureBuilder<List<Product>>(
-                    future: _productsFuture,
-                    builder: (ctx, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      if (snapshot.hasError) {
-                        // Fallback dummy for development if API fails
-                        return _buildDummyList();
-                      }
-                      final products = snapshot.data ?? [];
-                      if (products.isEmpty) return _buildDummyList();
-
-                      return ListView.builder(
-                        padding: const EdgeInsets.only(left: 16),
-                        scrollDirection: Axis.horizontal,
-                        itemCount: products.length,
-                        itemBuilder: (ctx, i) =>
-                            ProductItem(product: products[i]),
-                      );
-                    },
+                    ),
                   ),
-                ),
 
-                // Best Seller
-                SectionHeader(title: 'Best Seller', onViewAll: () {}),
-                SizedBox(
-                  height: 270,
-                  child: FutureBuilder<List<Product>>(
-                    future: _productsFuture, // Use same list for now
-                    builder: (ctx, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      final products = snapshot.data ?? [];
-                      if (products.isEmpty) return _buildDummyList();
+                  const SizedBox(height: 8),
 
-                      return ListView.builder(
-                        padding: const EdgeInsets.only(left: 16),
-                        scrollDirection: Axis.horizontal,
-                        itemCount: products.length,
-                        itemBuilder: (ctx, i) =>
-                            ProductItem(product: products.reversed.toList()[i]),
-                      );
-                    },
+                  // Best Seller Section
+                  SectionHeader(title: 'Best Seller', onViewAll: () {}),
+                  SizedBox(
+                    height: 280,
+                    child: FutureBuilder<List<Product>>(
+                      future: _bestSellersFuture,
+                      builder: (ctx, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+                        if (snapshot.hasError) {
+                          return _buildEmptyState('Gagal memuat produk');
+                        }
+                        final products = snapshot.data ?? [];
+                        if (products.isEmpty) {
+                          return _buildEmptyState('Belum ada produk terlaris');
+                        }
+
+                        return ListView.builder(
+                          padding: const EdgeInsets.only(left: 16),
+                          scrollDirection: Axis.horizontal,
+                          itemCount: products.length,
+                          itemBuilder: (ctx, i) =>
+                              ProductItem(product: products[i]),
+                        );
+                      },
+                    ),
                   ),
-                ),
-                const SizedBox(height: 32),
-              ],
+                  const SizedBox(height: 32),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBannerItem(String title, String subtitle, Color bgColor) {
+    return Container(
+      width: MediaQuery.of(context).size.width,
+      margin: const EdgeInsets.symmetric(horizontal: 5.0),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              letterSpacing: 2,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1,
             ),
           ),
         ],
@@ -138,36 +191,16 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildDummyList() {
-    // Dummy Data
-    final dummyProducts = [
-      Product(
-        id: 101,
-        name: 'Oversized Tee',
-        slug: 'oversized-tee',
-        description: 'Cotton',
-        price: 45.0,
+  Widget _buildEmptyState(String message) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.inventory_2_outlined, size: 48, color: Colors.grey[400]),
+          const SizedBox(height: 8),
+          Text(message, style: TextStyle(color: Colors.grey[600])),
+        ],
       ),
-      Product(
-        id: 102,
-        name: 'Cargo Pants',
-        slug: 'cargo-pants',
-        description: 'Utility',
-        price: 85.0,
-      ),
-      Product(
-        id: 103,
-        name: 'Varsity Jacket',
-        slug: 'varsity-jacket',
-        description: 'Wool',
-        price: 120.0,
-      ),
-    ];
-    return ListView.builder(
-      padding: const EdgeInsets.only(left: 16),
-      scrollDirection: Axis.horizontal,
-      itemCount: dummyProducts.length,
-      itemBuilder: (ctx, i) => ProductItem(product: dummyProducts[i]),
     );
   }
 }

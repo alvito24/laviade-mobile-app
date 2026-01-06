@@ -2,7 +2,6 @@ import 'product_model.dart';
 
 class OrderItem {
   final int id;
-  final Product? product;
   final int productId;
   final String productName;
   final String? productImage;
@@ -10,10 +9,10 @@ class OrderItem {
   final double price;
   final String? size;
   final String? color;
+  final Product? product;
 
   OrderItem({
     required this.id,
-    this.product,
     required this.productId,
     required this.productName,
     this.productImage,
@@ -21,60 +20,72 @@ class OrderItem {
     required this.price,
     this.size,
     this.color,
+    this.product,
   });
 
+  double get totalPrice => price * quantity;
+
   factory OrderItem.fromJson(Map<String, dynamic> json) {
+    Product? product;
+    if (json['product'] != null) {
+      product = Product.fromJson(json['product']);
+    }
+
     return OrderItem(
       id: json['id'],
-      product: json['product'] != null
-          ? Product.fromJson(json['product'])
-          : null,
-      productId: json['product_id'] ?? 0,
-      productName:
-          json['product_name'] ?? json['product']?['name'] ?? 'Unknown',
-      productImage:
-          json['product_image'] ??
-          json['product']?['primary_image']?['image_path'],
+      productId: json['product_id'] ?? product?.id ?? 0,
+      productName: json['product_name'] ?? product?.name ?? '',
+      productImage: json['product_image'] ?? product?.primaryImageUrl,
       quantity: json['quantity'] ?? 1,
-      price: double.tryParse(json['price']?.toString() ?? '0') ?? 0,
+      price: _parseDouble(json['price']),
       size: json['size'],
       color: json['color'],
+      product: product,
     );
   }
 
-  double get totalPrice => price * quantity;
+  static double _parseDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
+  }
 }
 
 class ShippingAddress {
   final String recipientName;
   final String phone;
-  final String fullAddress;
-  final String? province;
-  final String? city;
-  final String? district;
-  final String? postalCode;
+  final String province;
+  final String city;
+  final String district;
+  final String postalCode;
+  final String addressDetail;
 
   ShippingAddress({
     required this.recipientName,
     required this.phone,
-    required this.fullAddress,
-    this.province,
-    this.city,
-    this.district,
-    this.postalCode,
+    required this.province,
+    required this.city,
+    required this.district,
+    required this.postalCode,
+    required this.addressDetail,
   });
 
   factory ShippingAddress.fromJson(Map<String, dynamic> json) {
     return ShippingAddress(
       recipientName: json['recipient_name'] ?? '',
       phone: json['phone'] ?? '',
-      fullAddress: json['full_address'] ?? json['address_detail'] ?? '',
-      province: json['province'],
-      city: json['city'],
-      district: json['district'],
-      postalCode: json['postal_code'],
+      province: json['province'] ?? '',
+      city: json['city'] ?? '',
+      district: json['district'] ?? '',
+      postalCode: json['postal_code'] ?? '',
+      addressDetail: json['address_detail'] ?? '',
     );
   }
+
+  String get fullAddress =>
+      '$addressDetail, $district, $city, $province $postalCode';
 }
 
 class Order {
@@ -86,12 +97,13 @@ class Order {
   final double totalAmount;
   final String? shippingMethod;
   final String? paymentMethod;
-  final String? paymentChannel;
   final String? paymentStatus;
   final String? notes;
   final ShippingAddress? shippingAddress;
   final DateTime createdAt;
   final DateTime? paidAt;
+  final DateTime? shippedAt;
+  final DateTime? deliveredAt;
   final List<OrderItem> items;
 
   Order({
@@ -103,12 +115,13 @@ class Order {
     required this.totalAmount,
     this.shippingMethod,
     this.paymentMethod,
-    this.paymentChannel,
     this.paymentStatus,
     this.notes,
     this.shippingAddress,
     required this.createdAt,
     this.paidAt,
+    this.shippedAt,
+    this.deliveredAt,
     required this.items,
   });
 
@@ -122,33 +135,43 @@ class Order {
       return [];
     }
 
+    // Parse shipping address
+    ShippingAddress? parseAddress(dynamic addressData) {
+      if (addressData == null) return null;
+      if (addressData is Map<String, dynamic>) {
+        return ShippingAddress.fromJson(addressData);
+      }
+      return null;
+    }
+
     return Order(
       id: json['id'],
-      orderNumber: json['order_number'] ?? 'N/A',
+      orderNumber: json['order_number'] ?? '',
       status: json['status'] ?? 'pending',
-      subtotal: double.tryParse(json['subtotal']?.toString() ?? '0') ?? 0,
-      shippingCost:
-          double.tryParse(json['shipping_cost']?.toString() ?? '0') ?? 0,
-      totalAmount:
-          double.tryParse(json['total_amount']?.toString() ?? '0') ?? 0,
+      subtotal: _parseDouble(json['subtotal']),
+      shippingCost: _parseDouble(json['shipping_cost']),
+      totalAmount: _parseDouble(json['total_amount']),
       shippingMethod: json['shipping_method'],
       paymentMethod: json['payment_method'],
-      paymentChannel: json['payment_channel'],
       paymentStatus: json['payment_status'],
       notes: json['notes'],
-      shippingAddress: json['shipping_address'] != null
-          ? ShippingAddress.fromJson(json['shipping_address'])
-          : null,
-      createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
+      shippingAddress: parseAddress(json['shipping_address']),
+      createdAt: DateTime.parse(json['created_at']),
       paidAt: json['paid_at'] != null
           ? DateTime.tryParse(json['paid_at'])
+          : null,
+      shippedAt: json['shipped_at'] != null
+          ? DateTime.tryParse(json['shipped_at'])
+          : null,
+      deliveredAt: json['delivered_at'] != null
+          ? DateTime.tryParse(json['delivered_at'])
           : null,
       items: parseItems(json['items']),
     );
   }
 
-  // Helper getters
-  String get statusLabel {
+  // Get status display text
+  String get statusDisplay {
     switch (status.toLowerCase()) {
       case 'pending':
         return 'Menunggu Pembayaran';
@@ -165,5 +188,32 @@ class Order {
     }
   }
 
+  // Get status color
+  String get statusColor {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return 'orange';
+      case 'processing':
+        return 'blue';
+      case 'shipped':
+        return 'purple';
+      case 'delivered':
+        return 'green';
+      case 'cancelled':
+        return 'red';
+      default:
+        return 'grey';
+    }
+  }
+
+  // Check if order can be cancelled
   bool get canCancel => status.toLowerCase() == 'pending';
+
+  static double _parseDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
+  }
 }

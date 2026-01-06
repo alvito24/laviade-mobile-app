@@ -3,22 +3,22 @@ class User {
   final String name;
   final String email;
   final String? phone;
-  final String? gender;
-  final String? birthDate;
   final String? profilePhotoUrl;
-  final String? token;
+  final String? gender;
+  final DateTime? birthDate;
   final bool isActive;
+  final String? token;
 
   User({
     required this.id,
     required this.name,
     required this.email,
     this.phone,
+    this.profilePhotoUrl,
     this.gender,
     this.birthDate,
-    this.profilePhotoUrl,
-    this.token,
     this.isActive = true,
+    this.token,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -27,11 +27,13 @@ class User {
       name: json['name'] ?? '',
       email: json['email'] ?? '',
       phone: json['phone'],
-      gender: json['gender'],
-      birthDate: json['birth_date'],
       profilePhotoUrl: json['profile_photo_url'],
+      gender: json['gender'],
+      birthDate: json['birth_date'] != null
+          ? DateTime.tryParse(json['birth_date'])
+          : null,
+      isActive: json['is_active'] ?? true,
       token: json['token'],
-      isActive: json['is_active'] == 1 || json['is_active'] == true,
     );
   }
 
@@ -41,20 +43,45 @@ class User {
       'name': name,
       'email': email,
       'phone': phone,
-      'gender': gender,
-      'birth_date': birthDate,
       'profile_photo_url': profilePhotoUrl,
-      'token': token,
+      'gender': gender,
+      'birth_date': birthDate?.toIso8601String(),
       'is_active': isActive,
+      'token': token,
     };
+  }
+
+  // Create a copy with updated values
+  User copyWith({
+    int? id,
+    String? name,
+    String? email,
+    String? phone,
+    String? profilePhotoUrl,
+    String? gender,
+    DateTime? birthDate,
+    bool? isActive,
+    String? token,
+  }) {
+    return User(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      phone: phone ?? this.phone,
+      profilePhotoUrl: profilePhotoUrl ?? this.profilePhotoUrl,
+      gender: gender ?? this.gender,
+      birthDate: birthDate ?? this.birthDate,
+      isActive: isActive ?? this.isActive,
+      token: token ?? this.token,
+    );
   }
 
   // Get initials for avatar
   String get initials {
-    final names = name.split(' ');
-    if (names.length >= 2) {
-      return '${names[0][0]}${names[1][0]}'.toUpperCase();
+    final parts = name.split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
     }
-    return name.isNotEmpty ? name[0].toUpperCase() : '?';
+    return name.isNotEmpty ? name[0].toUpperCase() : 'U';
   }
 }

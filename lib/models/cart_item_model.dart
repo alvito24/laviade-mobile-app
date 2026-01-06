@@ -7,6 +7,7 @@ class CartItem {
   final String? size;
   final String? color;
   bool isSelected;
+  final double priceAtTime; // Price when added to cart
 
   CartItem({
     required this.id,
@@ -15,28 +16,36 @@ class CartItem {
     this.size,
     this.color,
     this.isSelected = true,
-  });
+    double? priceAtTime,
+  }) : priceAtTime = priceAtTime ?? product.currentPrice;
 
   factory CartItem.fromJson(Map<String, dynamic> json) {
     // Handle nested product data from Laravel API
-    // The API returns cart item with product relationship loaded
-    final productData = json['product'];
+    Product product;
+    if (json['product'] != null) {
+      product = Product.fromJson(json['product']);
+    } else {
+      // If product is flattened in the response
+      product = Product(
+        id: json['product_id'] ?? 0,
+        name: json['product_name'] ?? '',
+        slug: json['product_slug'] ?? '',
+        description: '',
+        price: _parseDouble(json['product_price'] ?? json['price']),
+        primaryImageUrl: json['product_image'] ?? json['image_url'],
+      );
+    }
 
     return CartItem(
       id: json['id'],
-      product: productData != null
-          ? Product.fromJson(productData)
-          : Product(
-              id: json['product_id'] ?? 0,
-              name: 'Unknown Product',
-              slug: 'unknown',
-              description: '',
-              price: 0,
-            ),
+      product: product,
       quantity: json['quantity'] ?? 1,
       size: json['size'],
       color: json['color'],
-      isSelected: json['is_selected'] == 1 || json['is_selected'] == true,
+      isSelected: json['is_selected'] ?? true,
+      priceAtTime: _parseDouble(
+        json['price'] ?? json['price_at_time'] ?? product.currentPrice,
+      ),
     );
   }
 
@@ -51,24 +60,22 @@ class CartItem {
     };
   }
 
-  double get totalPrice => product.currentPrice * quantity;
+  // Calculate total price for this item
+  double get totalPrice => priceAtTime * quantity;
 
-  // Copy with method for immutability
-  CartItem copyWith({
-    int? id,
-    Product? product,
-    int? quantity,
-    String? size,
-    String? color,
-    bool? isSelected,
-  }) {
-    return CartItem(
-      id: id ?? this.id,
-      product: product ?? this.product,
-      quantity: quantity ?? this.quantity,
-      size: size ?? this.size,
-      color: color ?? this.color,
-      isSelected: isSelected ?? this.isSelected,
-    );
+  // Get display variant text
+  String get variantText {
+    List<String> parts = [];
+    if (size != null && size!.isNotEmpty) parts.add('Size: $size');
+    if (color != null && color!.isNotEmpty) parts.add('Color: $color');
+    return parts.join(' | ');
+  }
+
+  static double _parseDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
   }
 }

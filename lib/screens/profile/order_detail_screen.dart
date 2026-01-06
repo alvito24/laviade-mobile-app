@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../models/order_model.dart';
-import '../../utils/constants.dart';
 import 'package:intl/intl.dart';
+import '../../models/order_model.dart';
 
 class OrderDetailScreen extends StatelessWidget {
   final Order order;
@@ -16,51 +15,102 @@ class OrderDetailScreen extends StatelessWidget {
     );
 
     return Scaffold(
-      appBar: AppBar(title: Text('ORDER #${order.orderNumber}')),
+      appBar: AppBar(title: Text('Order #${order.orderNumber}')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Order Info
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Date: ${DateFormat('dd MMM yyyy').format(order.createdAt)}',
+            // Order Status Card
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: _getStatusColor(order.status).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _getStatusColor(order.status).withOpacity(0.3),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _getStatusIcon(order.status),
                     color: _getStatusColor(order.status),
-                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Text(
-                    order.statusLabel,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      fontSize: 12,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          order.statusDisplay,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: _getStatusColor(order.status),
+                          ),
+                        ),
+                        Text(
+                          DateFormat(
+                            'dd MMM yyyy, HH:mm',
+                          ).format(order.createdAt),
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
 
-            const Divider(height: 32),
+            const SizedBox(height: 24),
+
+            // Shipping Address
+            if (order.shippingAddress != null) ...[
+              const Text(
+                'Alamat Pengiriman',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      order.shippingAddress!.recipientName,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(order.shippingAddress!.phone),
+                    const SizedBox(height: 4),
+                    Text(order.shippingAddress!.fullAddress),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
 
             // Order Items
             const Text(
-              'Items',
+              'Detail Pesanan',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
             const SizedBox(height: 12),
             ...order.items.map(
-              (item) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+              (item) => Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(8),
+                ),
                 child: Row(
                   children: [
                     Container(
@@ -69,21 +119,18 @@ class OrderDetailScreen extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: Colors.grey[200],
                         borderRadius: BorderRadius.circular(8),
+                        image: (item.productImage ?? '').isNotEmpty
+                            ? DecorationImage(
+                                image: NetworkImage(item.productImage!),
+                                fit: BoxFit.cover,
+                              )
+                            : null,
                       ),
-                      clipBehavior: Clip.hardEdge,
-                      child: item.productImage != null
-                          ? Image.network(
-                              AppConstants.getImageUrl(item.productImage),
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) =>
-                                  const Icon(Icons.image_not_supported),
-                            )
-                          : const Icon(
-                              Icons.image_not_supported,
-                              color: Colors.grey,
-                            ),
+                      child: (item.productImage ?? '').isEmpty
+                          ? const Icon(Icons.image, color: Colors.grey)
+                          : null,
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -95,148 +142,149 @@ class OrderDetailScreen extends StatelessWidget {
                           if (item.size != null || item.color != null)
                             Text(
                               [
-                                if (item.size != null) item.size,
-                                if (item.color != null) item.color,
-                              ].join(' / '),
+                                if (item.size != null) 'Size: ${item.size}',
+                                if (item.color != null) 'Color: ${item.color}',
+                              ].join(' | '),
                               style: TextStyle(
                                 color: Colors.grey[600],
                                 fontSize: 12,
                               ),
                             ),
-                          Text('x${item.quantity}'),
+                          Text(
+                            '${currencyFormat.format(item.price)} x ${item.quantity}',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 12,
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                    Text(currencyFormat.format(item.totalPrice)),
+                    Text(
+                      currencyFormat.format(item.totalPrice),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ],
                 ),
               ),
             ),
 
-            const Divider(height: 32),
+            const SizedBox(height: 16),
 
-            // Shipping Info
-            if (order.shippingAddress != null) ...[
-              const Text(
-                'Shipping Address',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            // Price Summary
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
               ),
-              const SizedBox(height: 8),
-              Text(
-                order.shippingAddress!.recipientName,
-                style: const TextStyle(fontWeight: FontWeight.w500),
-              ),
-              Text(order.shippingAddress!.phone),
-              Text(order.shippingAddress!.fullAddress),
-              const Divider(height: 32),
-            ],
-
-            // Payment Summary
-            _buildSummaryRow('Subtotal', currencyFormat.format(order.subtotal)),
-            _buildSummaryRow(
-              'Shipping',
-              currencyFormat.format(order.shippingCost),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Total',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  currencyFormat.format(order.totalAmount),
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+              child: Column(
+                children: [
+                  _buildPriceRow(
+                    'Subtotal',
+                    currencyFormat.format(order.subtotal),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 8),
+                  _buildPriceRow(
+                    'Ongkos Kirim',
+                    currencyFormat.format(order.shippingCost),
+                  ),
+                  const Divider(height: 24),
+                  _buildPriceRow(
+                    'Total',
+                    currencyFormat.format(order.totalAmount),
+                    isBold: true,
+                  ),
+                ],
+              ),
             ),
 
-            // Actions
+            // Cancel button for pending orders
             if (order.canCancel) ...[
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
                   onPressed: () {
-                    // Cancel order
                     showDialog(
                       context: context,
                       builder: (ctx) => AlertDialog(
-                        title: const Text('Cancel Order'),
+                        title: const Text('Batalkan Pesanan?'),
                         content: const Text(
-                          'Are you sure you want to cancel this order?',
+                          'Pesanan yang dibatalkan tidak dapat dikembalikan.',
                         ),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.pop(context),
-                            child: const Text('NO'),
+                            child: const Text('TIDAK'),
                           ),
                           TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('YES'),
+                            onPressed: () {
+                              Navigator.pop(context);
+                              // Cancel order logic
+                            },
+                            child: const Text(
+                              'YA, BATALKAN',
+                              style: TextStyle(color: Colors.red),
+                            ),
                           ),
                         ],
                       ),
                     );
                   },
-                  style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-                  child: const Text('CANCEL ORDER'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red,
+                    side: const BorderSide(color: Colors.red),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: const Text('BATALKAN PESANAN'),
                 ),
               ),
             ],
 
+            // Review button for delivered orders
             if (order.status.toLowerCase() == 'delivered') ...[
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: const Text('Write a Review'),
-                        content: const TextField(
-                          decoration: InputDecoration(
-                            hintText: 'Great product!',
-                          ),
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('CANCEL'),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('SUBMIT'),
-                          ),
-                        ],
-                      ),
-                    );
+                    // Navigate to review
                   },
-                  child: const Text('WRITE REVIEW'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: const Text('TULIS ULASAN'),
                 ),
               ),
             ],
+
+            const SizedBox(height: 32),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSummaryRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: TextStyle(color: Colors.grey[600])),
-          Text(value),
-        ],
-      ),
+  Widget _buildPriceRow(String label, String value, {bool isBold = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+            fontSize: isBold ? 18 : 14,
+          ),
+        ),
+      ],
     );
   }
 
@@ -254,6 +302,23 @@ class OrderDetailScreen extends StatelessWidget {
         return Colors.red;
       default:
         return Colors.grey;
+    }
+  }
+
+  IconData _getStatusIcon(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return Icons.access_time;
+      case 'processing':
+        return Icons.inventory_2;
+      case 'shipped':
+        return Icons.local_shipping;
+      case 'delivered':
+        return Icons.check_circle;
+      case 'cancelled':
+        return Icons.cancel;
+      default:
+        return Icons.info;
     }
   }
 }

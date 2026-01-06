@@ -15,6 +15,13 @@ class _ShopScreenState extends State<ShopScreen> {
   final _searchController = TextEditingController();
   List<Product> _products = [];
   bool _isLoading = false;
+  bool _hasMore = true;
+  int _currentPage = 1;
+
+  // Filter values
+  double? _minPrice;
+  double? _maxPrice;
+  String _sortBy = 'latest';
 
   @override
   void initState() {
@@ -22,46 +29,190 @@ class _ShopScreenState extends State<ShopScreen> {
     _fetchProducts();
   }
 
-  Future<void> _fetchProducts({String? query}) async {
+  Future<void> _fetchProducts({String? query, bool refresh = false}) async {
+    if (refresh) {
+      _currentPage = 1;
+      _products = [];
+    }
+
     setState(() => _isLoading = true);
     try {
-      final products = await Provider.of<ProductService>(context, listen: false).getProducts(query: query);
-      setState(() => _products = products);
+      final response = await Provider.of<ProductService>(context, listen: false)
+          .getProducts(
+            search: query ?? _searchController.text,
+            minPrice: _minPrice,
+            maxPrice: _maxPrice,
+            sort: _sortBy,
+            page: _currentPage,
+          );
+
+      setState(() {
+        if (refresh) {
+          _products = response.products;
+        } else {
+          _products.addAll(response.products);
+        }
+        _hasMore = response.hasMorePages;
+      });
     } catch (e) {
-      // Fallback
-       setState(() => _products = []);
+      setState(() => _products = []);
     } finally {
       setState(() => _isLoading = false);
     }
   }
 
   void _showFilter() {
-    showModalBottomSheet(context: context, builder: (ctx) {
-      return Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Filter', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 20),
-            const Text('Price Range'),
-            RangeSlider(values: const RangeValues(0, 100), min: 0, max: 500, onChanged: null), // Dummy
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  _fetchProducts(); // Apply logic
-                }, 
-                child: const Text('APPLY')
+    double tempMin = _minPrice ?? 0;
+    double tempMax = _maxPrice ?? 1000000;
+    String tempSort = _sortBy;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+                left: 20,
+                right: 20,
+                top: 20,
               ),
-            )
-          ],
-        ),
-      );
-    });
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Filter',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          setModalState(() {
+                            tempMin = 0;
+                            tempMax = 1000000;
+                            tempSort = 'latest';
+                          });
+                        },
+                        child: const Text('Reset'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Sort
+                  const Text(
+                    'Urutkan',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      _buildSortChip(
+                        'Terbaru',
+                        'latest',
+                        tempSort,
+                        (val) => setModalState(() => tempSort = val),
+                      ),
+                      _buildSortChip(
+                        'Termurah',
+                        'price_low',
+                        tempSort,
+                        (val) => setModalState(() => tempSort = val),
+                      ),
+                      _buildSortChip(
+                        'Termahal',
+                        'price_high',
+                        tempSort,
+                        (val) => setModalState(() => tempSort = val),
+                      ),
+                      _buildSortChip(
+                        'Terlaris',
+                        'popular',
+                        tempSort,
+                        (val) => setModalState(() => tempSort = val),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Rentang Harga',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  RangeSlider(
+                    values: RangeValues(tempMin, tempMax),
+                    min: 0,
+                    max: 1000000,
+                    divisions: 20,
+                    labels: RangeLabels(
+                      'Rp ${(tempMin / 1000).toStringAsFixed(0)}K',
+                      'Rp ${(tempMax / 1000).toStringAsFixed(0)}K',
+                    ),
+                    onChanged: (values) {
+                      setModalState(() {
+                        tempMin = values.start;
+                        tempMax = values.end;
+                      });
+                    },
+                  ),
+
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.black,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        setState(() {
+                          _minPrice = tempMin > 0 ? tempMin : null;
+                          _maxPrice = tempMax < 1000000 ? tempMax : null;
+                          _sortBy = tempSort;
+                        });
+                        _fetchProducts(refresh: true);
+                      },
+                      child: const Text('TERAPKAN FILTER'),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildSortChip(
+    String label,
+    String value,
+    String current,
+    Function(String) onSelected,
+  ) {
+    final isSelected = current == value;
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (_) => onSelected(value),
+      selectedColor: Colors.black,
+      labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.black),
+    );
   }
 
   @override
@@ -78,34 +229,67 @@ class _ShopScreenState extends State<ShopScreen> {
                 Expanded(
                   child: TextField(
                     controller: _searchController,
-                    decoration: const InputDecoration(
-                      hintText: 'Search products...',
-                      prefixIcon: Icon(Icons.search),
+                    decoration: InputDecoration(
+                      hintText: 'Cari produk...',
+                      prefixIcon: const Icon(Icons.search),
                       filled: true,
-                      fillColor: Colors.white,
+                      fillColor: Colors.grey[100],
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 0),
                     ),
-                    onSubmitted: (val) => _fetchProducts(query: val),
+                    onSubmitted: (val) =>
+                        _fetchProducts(query: val, refresh: true),
                   ),
                 ),
-                IconButton(icon: const Icon(Icons.filter_list), onPressed: _showFilter)
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.filter_list),
+                  onPressed: _showFilter,
+                ),
               ],
             ),
           ),
         ),
       ),
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator())
-        : GridView.builder(
-            padding: const EdgeInsets.all(16),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              childAspectRatio: 0.7,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-            ),
-            itemCount: _products.length,
-            itemBuilder: (ctx, i) => ProductItem(product: _products[i]),
-          ),
+      body: RefreshIndicator(
+        onRefresh: () => _fetchProducts(refresh: true),
+        child: _isLoading && _products.isEmpty
+            ? const Center(child: CircularProgressIndicator())
+            : _products.isEmpty
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Produk tidak ditemukan',
+                      style: TextStyle(color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+              )
+            : GridView.builder(
+                padding: const EdgeInsets.all(16),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 0.6,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                ),
+                itemCount: _products.length,
+                itemBuilder: (ctx, i) => ProductItem(product: _products[i]),
+              ),
+      ),
     );
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 }

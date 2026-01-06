@@ -1,5 +1,3 @@
-import '../utils/constants.dart';
-
 class Category {
   final int id;
   final String name;
@@ -20,24 +18,22 @@ class Category {
 
 class ProductImage {
   final int id;
-  final String imagePath;
+  final String imageUrl;
   final bool isPrimary;
 
   ProductImage({
     required this.id,
-    required this.imagePath,
+    required this.imageUrl,
     this.isPrimary = false,
   });
 
   factory ProductImage.fromJson(Map<String, dynamic> json) {
     return ProductImage(
       id: json['id'],
-      imagePath: json['image_path'] ?? '',
-      isPrimary: json['is_primary'] == 1 || json['is_primary'] == true,
+      imageUrl: json['image_url'] ?? json['url'] ?? '',
+      isPrimary: json['is_primary'] ?? false,
     );
   }
-
-  String get fullUrl => AppConstants.getImageUrl(imagePath);
 }
 
 class Product {
@@ -46,18 +42,18 @@ class Product {
   final String slug;
   final String description;
   final double price;
-  final double? discountPrice;
+  final double? salePrice;
+  final String? primaryImageUrl;
+  final List<ProductImage> images;
+  final Category? category;
+  final double rating;
+  final int reviewCount;
   final int stock;
   final List<String> sizes;
   final List<String> colors;
-  final Category? category;
-  final List<ProductImage> images;
-  final double rating;
-  final int totalSold;
   final bool isActive;
   final bool isFeatured;
   final bool isNewArrival;
-  final bool isBestSeller;
 
   Product({
     required this.id,
@@ -65,68 +61,79 @@ class Product {
     required this.slug,
     required this.description,
     required this.price,
-    this.discountPrice,
+    this.salePrice,
+    this.primaryImageUrl,
+    this.images = const [],
+    this.category,
+    this.rating = 0.0,
+    this.reviewCount = 0,
     this.stock = 0,
     this.sizes = const [],
     this.colors = const [],
-    this.category,
-    this.images = const [],
-    this.rating = 0.0,
-    this.totalSold = 0,
     this.isActive = true,
     this.isFeatured = false,
     this.isNewArrival = false,
-    this.isBestSeller = false,
   });
 
-  // Get primary image URL
-  String get imageUrl {
-    final primary = images.where((img) => img.isPrimary).toList();
-    if (primary.isNotEmpty) {
-      return primary.first.fullUrl;
-    }
-    if (images.isNotEmpty) {
-      return images.first.fullUrl;
-    }
-    return AppConstants.getImageUrl(null);
+  // Get the display price (sale price if available, otherwise regular price)
+  double get currentPrice => salePrice ?? price;
+
+  // Check if product is on sale
+  bool get isOnSale => salePrice != null && salePrice! < price;
+
+  // Get discount percentage
+  int get discountPercentage {
+    if (!isOnSale) return 0;
+    return (((price - salePrice!) / price) * 100).round();
   }
 
-  // Get current price (considering discount)
-  double get currentPrice => discountPrice ?? price;
-
-  // Check if product has discount
-  bool get hasDiscount => discountPrice != null && discountPrice! < price;
-
-  // Calculate discount percentage
-  int get discountPercentage {
-    if (!hasDiscount) return 0;
-    return (((price - discountPrice!) / price) * 100).round();
+  // Get primary image or first image
+  String get displayImage {
+    if (primaryImageUrl != null && primaryImageUrl!.isNotEmpty) {
+      return primaryImageUrl!;
+    }
+    if (images.isNotEmpty) {
+      final primary = images.firstWhere(
+        (img) => img.isPrimary,
+        orElse: () => images.first,
+      );
+      return primary.imageUrl;
+    }
+    return ''; // Placeholder image URL could go here
   }
 
   factory Product.fromJson(Map<String, dynamic> json) {
-    // Parse sizes - can be JSON string or List
+    // Parse sizes - can be JSON string or list
     List<String> parseSizes(dynamic sizesData) {
       if (sizesData == null) return [];
-      if (sizesData is List) return sizesData.map((e) => e.toString()).toList();
-      if (sizesData is String && sizesData.isNotEmpty) {
+      if (sizesData is List) return sizesData.cast<String>();
+      if (sizesData is String) {
         try {
-          return List<String>.from(sizesData.split(',').map((e) => e.trim()));
-        } catch (e) {
-          return [];
+          // Try to parse as JSON array
+          return List<String>.from(
+            (sizesData.startsWith('[')
+                ? List.from(
+                    json.containsKey('sizes_parsed')
+                        ? json['sizes_parsed']
+                        : [],
+                  )
+                : sizesData.split(',').map((s) => s.trim())),
+          );
+        } catch (_) {
+          return sizesData.split(',').map((s) => s.trim()).toList();
         }
       }
       return [];
     }
 
-    // Parse colors - can be JSON string or List
+    // Parse colors - can be JSON string or list
     List<String> parseColors(dynamic colorsData) {
       if (colorsData == null) return [];
-      if (colorsData is List)
-        return colorsData.map((e) => e.toString()).toList();
-      if (colorsData is String && colorsData.isNotEmpty) {
+      if (colorsData is List) return colorsData.cast<String>();
+      if (colorsData is String) {
         try {
-          return List<String>.from(colorsData.split(',').map((e) => e.trim()));
-        } catch (e) {
+          return colorsData.split(',').map((s) => s.trim()).toList();
+        } catch (_) {
           return [];
         }
       }
@@ -134,28 +141,12 @@ class Product {
     }
 
     // Parse images
-    List<ProductImage> parseImages(dynamic imagesData, dynamic primaryImage) {
-      List<ProductImage> result = [];
-
-      // Add primary image first if exists
-      if (primaryImage != null && primaryImage is Map<String, dynamic>) {
-        result.add(ProductImage.fromJson(primaryImage));
+    List<ProductImage> parseImages(dynamic imagesData) {
+      if (imagesData == null) return [];
+      if (imagesData is List) {
+        return imagesData.map((img) => ProductImage.fromJson(img)).toList();
       }
-
-      // Add other images
-      if (imagesData != null && imagesData is List) {
-        for (var img in imagesData) {
-          if (img is Map<String, dynamic>) {
-            // Avoid duplicates
-            final newImg = ProductImage.fromJson(img);
-            if (!result.any((existing) => existing.id == newImg.id)) {
-              result.add(newImg);
-            }
-          }
-        }
-      }
-
-      return result;
+      return [];
     }
 
     return Product(
@@ -163,25 +154,31 @@ class Product {
       name: json['name'] ?? '',
       slug: json['slug'] ?? '',
       description: json['description'] ?? '',
-      price: double.tryParse(json['price']?.toString() ?? '0') ?? 0,
-      discountPrice: json['discount_price'] != null
-          ? double.tryParse(json['discount_price'].toString())
+      price: _parseDouble(json['price']),
+      salePrice: json['sale_price'] != null
+          ? _parseDouble(json['sale_price'])
           : null,
-      stock: json['stock'] ?? 0,
-      sizes: parseSizes(json['sizes']),
-      colors: parseColors(json['colors']),
+      primaryImageUrl: json['primary_image_url'] ?? json['image_url'],
+      images: parseImages(json['images']),
       category: json['category'] != null
           ? Category.fromJson(json['category'])
           : null,
-      images: parseImages(json['images'], json['primary_image']),
-      rating: double.tryParse(json['rating']?.toString() ?? '0') ?? 0.0,
-      totalSold: json['total_sold'] ?? 0,
-      isActive: json['is_active'] == 1 || json['is_active'] == true,
-      isFeatured: json['is_featured'] == 1 || json['is_featured'] == true,
-      isNewArrival:
-          json['is_new_arrival'] == 1 || json['is_new_arrival'] == true,
-      isBestSeller:
-          json['is_best_seller'] == 1 || json['is_best_seller'] == true,
+      rating: _parseDouble(json['average_rating'] ?? json['rating'] ?? 0),
+      reviewCount: json['reviews_count'] ?? json['review_count'] ?? 0,
+      stock: json['stock'] ?? 0,
+      sizes: parseSizes(json['sizes']),
+      colors: parseColors(json['colors']),
+      isActive: json['is_active'] ?? true,
+      isFeatured: json['is_featured'] ?? false,
+      isNewArrival: json['is_new_arrival'] ?? false,
     );
+  }
+
+  static double _parseDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
   }
 }
