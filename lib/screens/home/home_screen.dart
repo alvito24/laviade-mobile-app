@@ -2,7 +2,10 @@ import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/product_model.dart';
+import '../../models/banner_model.dart';
+import '../../models/category_model.dart';
 import '../../services/product_service.dart';
+import '../../services/home_service.dart';
 import '../../widgets/product_item.dart';
 import '../../widgets/section_header.dart';
 
@@ -16,13 +19,23 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late Future<List<Product>> _newArrivalsFuture;
   late Future<List<Product>> _bestSellersFuture;
+  late Future<List<AppBanner>> _bannersFuture;
+  late Future<List<Category>> _categoriesFuture;
 
   @override
   void initState() {
     super.initState();
+    _fetchData();
+  }
+
+  void _fetchData() {
     final productService = Provider.of<ProductService>(context, listen: false);
+    final homeService = Provider.of<HomeService>(context, listen: false);
+
     _newArrivalsFuture = productService.getNewArrivals();
     _bestSellersFuture = productService.getBestSellers();
+    _bannersFuture = homeService.getBanners();
+    _categoriesFuture = homeService.getCategories();
   }
 
   @override
@@ -31,13 +44,15 @@ class _HomeScreenState extends State<HomeScreen> {
       body: RefreshIndicator(
         onRefresh: () async {
           setState(() {
-            final productService = Provider.of<ProductService>(
-              context,
-              listen: false,
-            );
-            _newArrivalsFuture = productService.getNewArrivals();
-            _bestSellersFuture = productService.getBestSellers();
+            _fetchData();
           });
+          // Wait for all to complete
+          await Future.wait([
+            _newArrivalsFuture,
+            _bestSellersFuture,
+            _bannersFuture,
+            _categoriesFuture,
+          ]);
         },
         child: CustomScrollView(
           slivers: [
@@ -56,28 +71,125 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Banner Carousel
-                  CarouselSlider(
-                    options: CarouselOptions(
-                      height: 200.0,
-                      autoPlay: true,
-                      enlargeCenterPage: true,
-                      viewportFraction: 0.9,
-                      aspectRatio: 16 / 9,
+                  const SizedBox(height: 16),
+
+                  // Banners Section
+                  FutureBuilder<List<AppBanner>>(
+                    future: _bannersFuture,
+                    builder: (ctx, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return Container(
+                          height: 200,
+                          margin: const EdgeInsets.symmetric(horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Center(
+                            child: CircularProgressIndicator(),
+                          ),
+                        );
+                      }
+
+                      final banners = snapshot.data ?? [];
+                      if (banners.isEmpty) {
+                        // Fallback to static if no banners
+                        return CarouselSlider(
+                          options: CarouselOptions(
+                            height: 200.0,
+                            autoPlay: true,
+                            enlargeCenterPage: true,
+                            viewportFraction: 0.9,
+                            aspectRatio: 16 / 9,
+                          ),
+                          items: [
+                            _buildStaticBanner(
+                              'NEW COLLECTION',
+                              '2026',
+                              Colors.black,
+                            ),
+                            _buildStaticBanner(
+                              'SALE UP TO',
+                              '50% OFF',
+                              Colors.red[800]!,
+                            ),
+                            _buildStaticBanner(
+                              'FREE SHIPPING',
+                              'Min. Order 500K',
+                              Colors.grey[800]!,
+                            ),
+                          ],
+                        );
+                      }
+
+                      return CarouselSlider(
+                        options: CarouselOptions(
+                          height: 200.0,
+                          autoPlay: true,
+                          enlargeCenterPage: true,
+                          viewportFraction: 0.9,
+                          aspectRatio: 16 / 9,
+                        ),
+                        items: banners.map((banner) {
+                          return Container(
+                            width: MediaQuery.of(context).size.width,
+                            margin: const EdgeInsets.symmetric(horizontal: 5.0),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[300],
+                              borderRadius: BorderRadius.circular(12),
+                              image: banner.imageUrl.isNotEmpty
+                                  ? DecorationImage(
+                                      image: NetworkImage(banner.imageUrl),
+                                      fit: BoxFit.cover,
+                                    )
+                                  : null,
+                            ),
+                          );
+                        }).toList(),
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Categories Section
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: const Text(
+                      'Categories',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
                     ),
-                    items: [
-                      _buildBannerItem('NEW COLLECTION', '2026', Colors.black),
-                      _buildBannerItem(
-                        'SALE UP TO',
-                        '50% OFF',
-                        Colors.red[800]!,
-                      ),
-                      _buildBannerItem(
-                        'FREE SHIPPING',
-                        'Min. Order 500K',
-                        Colors.grey[800]!,
-                      ),
-                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 100,
+                    child: FutureBuilder<List<Category>>(
+                      future: _categoriesFuture,
+                      builder: (ctx, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+
+                        final categories = snapshot.data ?? [];
+                        if (categories.isEmpty) {
+                          return const Center(child: Text('No categories'));
+                        }
+
+                        return ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          scrollDirection: Axis.horizontal,
+                          itemCount: categories.length,
+                          itemBuilder: (ctx, i) =>
+                              _buildCategoryItem(categories[i]),
+                        );
+                      },
+                    ),
                   ),
 
                   const SizedBox(height: 24),
@@ -157,7 +269,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildBannerItem(String title, String subtitle, Color bgColor) {
+  Widget _buildStaticBanner(String title, String subtitle, Color bgColor) {
     return Container(
       width: MediaQuery.of(context).size.width,
       margin: const EdgeInsets.symmetric(horizontal: 5.0),
@@ -184,6 +296,44 @@ class _HomeScreenState extends State<HomeScreen> {
               fontSize: 28,
               fontWeight: FontWeight.bold,
               letterSpacing: 1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryItem(Category category) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 16),
+      child: Column(
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              shape: BoxShape.circle,
+              image: category.iconUrl != null
+                  ? DecorationImage(
+                      image: NetworkImage(category.iconUrl!),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
+            ),
+            child: category.iconUrl == null
+                ? const Icon(Icons.category, color: Colors.grey)
+                : null,
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: 70,
+            child: Text(
+              category.name,
+              style: const TextStyle(fontSize: 12),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
             ),
           ),
         ],

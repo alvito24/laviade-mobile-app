@@ -43,4 +43,7 @@ class AppConstants {
   static const String checkoutEndpoint = '/checkout';
   static const String profileEndpoint = '/profile';
   static const String addressesEndpoint = '/addresses';
+  static const String wishlistEndpoint = '/wishlist';
+  static const String bannersEndpoint = '/banners';
+  static const String categoriesEndpoint = '/categories';
 }

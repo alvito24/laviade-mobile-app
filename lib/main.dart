@@ -5,6 +5,8 @@ import 'services/cart_service.dart';
 import 'services/product_service.dart';
 import 'services/order_service.dart';
 import 'services/address_service.dart';
+import 'services/wishlist_service.dart';
+import 'services/home_service.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/main_nav_screen.dart';
 import 'screens/splash_screen.dart';
@@ -31,6 +33,19 @@ class MyApp extends StatelessWidget {
               CartService(auth.token, previous == null ? [] : previous.items),
         ),
 
+        // Wishlist Service - depends on auth token
+        ChangeNotifierProxyProvider<AuthService, WishlistService>(
+          create: (ctx) => WishlistService(null),
+          update: (ctx, auth, previous) {
+            final service = WishlistService(auth.token);
+            // Copy existing items if available
+            if (previous != null && auth.token != null) {
+              service.fetchWishlist();
+            }
+            return service;
+          },
+        ),
+
         // Product Service - optionally uses auth token
         ProxyProvider<AuthService, ProductService>(
           update: (ctx, auth, _) => ProductService(auth.token),
@@ -44,6 +59,11 @@ class MyApp extends StatelessWidget {
         // Address Service - depends on auth token
         ProxyProvider<AuthService, AddressService>(
           update: (ctx, auth, _) => AddressService(auth.token),
+        ),
+
+        // Home Service - optionally uses auth token
+        ProxyProvider<AuthService, HomeService>(
+          update: (ctx, auth, _) => HomeService(auth.token),
         ),
       ],
       child: Consumer<AuthService>(
