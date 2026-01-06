@@ -1,20 +1,5 @@
-class Category {
-  final int id;
-  final String name;
-  final String? slug;
-  final String? imageUrl;
-
-  Category({required this.id, required this.name, this.slug, this.imageUrl});
-
-  factory Category.fromJson(Map<String, dynamic> json) {
-    return Category(
-      id: json['id'],
-      name: json['name'],
-      slug: json['slug'],
-      imageUrl: json['image_url'],
-    );
-  }
-}
+import 'package:laviade_mobile_app/models/category_model.dart';
+export 'package:laviade_mobile_app/models/category_model.dart';
 
 class ProductImage {
   final int id;

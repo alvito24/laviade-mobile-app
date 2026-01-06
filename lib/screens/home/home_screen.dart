@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/product_model.dart';
 import '../../models/banner_model.dart';
-import '../../models/category_model.dart';
 import '../../services/product_service.dart';
 import '../../services/home_service.dart';
 import '../../widgets/product_item.dart';
@@ -131,19 +130,99 @@ class _HomeScreenState extends State<HomeScreen> {
                           aspectRatio: 16 / 9,
                         ),
                         items: banners.map((banner) {
-                          return Container(
-                            width: MediaQuery.of(context).size.width,
-                            margin: const EdgeInsets.symmetric(horizontal: 5.0),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[300],
-                              borderRadius: BorderRadius.circular(12),
-                              image: banner.imageUrl.isNotEmpty
-                                  ? DecorationImage(
-                                      image: NetworkImage(banner.imageUrl),
-                                      fit: BoxFit.cover,
-                                    )
-                                  : null,
-                            ),
+                          return Stack(
+                            children: [
+                              Container(
+                                width: MediaQuery.of(context).size.width,
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: 5.0,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[300],
+                                  borderRadius: BorderRadius.circular(12),
+                                  image: banner.displayImageUrl.isNotEmpty
+                                      ? DecorationImage(
+                                          image: NetworkImage(
+                                            banner.displayImageUrl,
+                                          ),
+                                          fit: BoxFit.cover,
+                                        )
+                                      : null,
+                                ),
+                              ),
+                              // Overlay with title, subtitle, and CTA
+                              if (banner.title.isNotEmpty ||
+                                  banner.ctaText != null)
+                                Positioned(
+                                  bottom: 0,
+                                  left: 5,
+                                  right: 5,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      borderRadius: const BorderRadius.vertical(
+                                        bottom: Radius.circular(12),
+                                      ),
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                        colors: [
+                                          Colors.transparent,
+                                          Colors.black.withOpacity(0.7),
+                                        ],
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        if (banner.title.isNotEmpty)
+                                          Text(
+                                            banner.title,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        if (banner.subtitle.isNotEmpty) ...[
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            banner.subtitle,
+                                            style: const TextStyle(
+                                              color: Colors.white70,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
+                                        if (banner.ctaText != null) ...[
+                                          const SizedBox(height: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 6,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              banner.ctaText!,
+                                              style: const TextStyle(
+                                                color: Colors.black,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                            ],
                           );
                         }).toList(),
                       );

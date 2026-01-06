@@ -15,7 +15,7 @@ class _ShopScreenState extends State<ShopScreen> {
   final _searchController = TextEditingController();
   List<Product> _products = [];
   bool _isLoading = false;
-  bool _hasMore = true;
+  bool _hasMore = true; // ignore: unused_field - prepared for pagination
   int _currentPage = 1;
 
   // Filter values

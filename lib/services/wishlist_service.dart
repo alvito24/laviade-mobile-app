@@ -34,7 +34,9 @@ class WishlistService with ChangeNotifier {
     notifyListeners();
 
     try {
-      final url = Uri.parse('${AppConstants.baseUrl}/wishlist');
+      final url = Uri.parse(
+        '${AppConstants.baseUrl}${AppConstants.wishlistEndpoint}',
+      );
       final response = await http.get(url, headers: _headers);
 
       if (response.statusCode == 200) {
@@ -71,8 +73,15 @@ class WishlistService with ChangeNotifier {
     if (token == null) return;
 
     try {
-      final url = Uri.parse('${AppConstants.baseUrl}/wishlist/${product.id}');
-      final response = await http.post(url, headers: _headers);
+      // Use the correct Laravel API endpoint: POST /wishlist/toggle
+      final url = Uri.parse(
+        '${AppConstants.baseUrl}${AppConstants.wishlistEndpoint}/toggle',
+      );
+      final response = await http.post(
+        url,
+        headers: _headers,
+        body: json.encode({'product_id': product.id}),
+      );
 
       if (response.statusCode != 200 && response.statusCode != 201) {
         // Rollback on error
@@ -108,7 +117,9 @@ class WishlistService with ChangeNotifier {
     if (token == null) return;
 
     try {
-      final url = Uri.parse('${AppConstants.baseUrl}/wishlist/$productId');
+      final url = Uri.parse(
+        '${AppConstants.baseUrl}${AppConstants.wishlistEndpoint}/$productId',
+      );
       final response = await http.delete(url, headers: _headers);
 
       if (response.statusCode != 200) {
